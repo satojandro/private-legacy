@@ -1,25 +1,66 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 
-// Type for the structured memory returned by /api/structure
+const STORAGE_KEY = "stories";
+const MAX_STORIES = 20;
+
 interface StructuredResult {
   title: string;
   narrative: string;
   questions: string[];
 }
 
+interface SavedStory {
+  id: string;
+  title: string;
+  narrative: string;
+  createdAt: string;
+}
+
 export default function Home() {
   const [recording, setRecording] = useState(false);
-  const [transcript, setTranscript] = useState("");
-  const [result, setResult] = useState<StructuredResult | null>(null);
+  const [processing, setProcessing] = useState(false);
+  const [recordingMode, setRecordingMode] = useState<"initial" | "respond">("initial");
   const [error, setError] = useState<string | null>(null);
+
+  // Session state: turn 0 = not started, 1 = after structure, 2 = after first continue, 3 = after second continue
+  const [turn, setTurn] = useState(0);
+  const [title, setTitle] = useState("");
+  const [narrative, setNarrative] = useState("");
+  const [followUpQuestion, setFollowUpQuestion] = useState("");
+  const [transcript, setTranscript] = useState("");
+  const [sessionComplete, setSessionComplete] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  const [stories, setStories] = useState<SavedStory[]>([]);
+  const [expandedStoryId, setExpandedStoryId] = useState<string | null>(null);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const chunksRef = useRef<Blob[]>([]);
 
-  const startRecording = async () => {
+  // Load previous memories from localStorage on mount
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw) as SavedStory[];
+        setStories(Array.isArray(parsed) ? parsed.slice(-MAX_STORIES) : []);
+      }
+    } catch {
+      setStories([]);
+    }
+  }, []);
+
+  const startRecording = (mode: "initial" | "respond") => {
+    setRecordingMode(mode);
+    setError(null);
+    // Do NOT set recording true here — wait until MediaRecorder has started (in doStartRecording)
+    // so stopRecording() always has a valid ref and "recording" state.
+  };
+
+  const doStartRecording = async () => {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     streamRef.current = stream;
     const mediaRecorder = new MediaRecorder(stream);
@@ -31,11 +72,26 @@ export default function Home() {
     };
 
     mediaRecorder.onstop = async () => {
+      const chunksCount = chunksRef.current.length;
       streamRef.current?.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
       setError(null);
 
       const blob = new Blob(chunksRef.current, { type: "audio/webm" });
+      const blobSize = blob.size;
+      // #region agent log
+      fetch("http://127.0.0.1:7517/ingest/29f6c99d-6e54-4411-8bb7-56e270ef8e56", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "d18319" },
+        body: JSON.stringify({
+          sessionId: "d18319",
+          location: "page.tsx:onstop",
+          message: "onstop fired, blob built",
+          data: { chunksCount, blobSize, hypothesisId: "onstop_blob" },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+      // #endregion
       const formData = new FormData();
       formData.append("file", blob);
 
@@ -45,88 +101,233 @@ export default function Home() {
           body: formData,
         });
         const data = await res.json();
+        // #region agent log
+        fetch("http://127.0.0.1:7517/ingest/29f6c99d-6e54-4411-8bb7-56e270ef8e56", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "d18319" },
+          body: JSON.stringify({
+            sessionId: "d18319",
+            location: "page.tsx:after_transcribe",
+            message: "transcribe response",
+            data: {
+              ok: res.ok,
+              status: res.status,
+              transcriptLength: typeof data?.transcript === "string" ? data.transcript.length : 0,
+              error: data?.error ?? null,
+              hypothesisId: "transcribe_res",
+            },
+            timestamp: Date.now(),
+          }),
+        }).catch(() => {});
+        // #endregion
         if (!res.ok) {
           const msg = data.details
             ? `${data.error ?? "Transcribe failed"}: ${data.details}`
             : (data.error ?? data.details ?? "Transcribe failed");
           setError(msg);
+          setRecording(false);
+          setProcessing(false);
           return;
         }
-        setTranscript(data.transcript);
+        const newTranscript = data.transcript;
 
-        const structureRes = await fetch("/api/structure", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ transcript: data.transcript }),
-        });
-        const structured = await structureRes.json();
-        if (!structureRes.ok) {
-          const msg = structured.details
-            ? `${structured.error ?? "Structure failed"}: ${structured.details}`
-            : (structured.error ?? structured.details ?? "Structure failed");
-          setError(msg);
-          return;
+        if (recordingMode === "initial") {
+          const structureRes = await fetch("/api/structure", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ transcript: newTranscript }),
+          });
+          const structured = (await structureRes.json()) as StructuredResult & { error?: string; details?: string };
+          if (!structureRes.ok) {
+            const msg = structured.details
+              ? `${structured.error ?? "Structure failed"}: ${structured.details}`
+              : (structured.error ?? structured.details ?? "Structure failed");
+            setError(msg);
+            setRecording(false);
+            setProcessing(false);
+            return;
+          }
+          setTitle(structured.title);
+          setNarrative(structured.narrative);
+          setFollowUpQuestion(structured.questions?.[0] ?? "");
+          setTranscript(newTranscript);
+          // Turn only increments after agent responds (not after user records)
+          setTurn(1);
+        } else {
+          const continueRes = await fetch("/api/continue", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              narrative,
+              lastQuestion: followUpQuestion,
+              transcript: newTranscript,
+            }),
+          });
+          const continued = (await continueRes.json()) as { narrative?: string; question?: string; error?: string; details?: string };
+          if (!continueRes.ok) {
+            const msg = continued.details
+              ? `${continued.error ?? "Continue failed"}: ${continued.details}`
+              : (continued.error ?? continued.details ?? "Continue failed");
+            setError(msg);
+            setRecording(false);
+            setProcessing(false);
+            return;
+          }
+          setNarrative(continued.narrative ?? "");
+          setFollowUpQuestion(continued.question ?? "");
+          setTranscript(newTranscript);
+          // Turn only increments after agent responds
+          setTurn((t) => {
+            const next = t + 1;
+            if (next >= 3) setSessionComplete(true);
+            return next;
+          });
         }
-        setResult(structured);
       } catch (e) {
-        setError(e instanceof Error ? e.message : "Something went wrong");
+        const errMsg = e instanceof Error ? e.message : "Something went wrong";
+        // #region agent log
+        fetch("http://127.0.0.1:7517/ingest/29f6c99d-6e54-4411-8bb7-56e270ef8e56", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "d18319" },
+          body: JSON.stringify({
+            sessionId: "d18319",
+            location: "page.tsx:onstop_catch",
+            message: "onstop try/catch",
+            data: { error: errMsg, hypothesisId: "onstop_catch" },
+            timestamp: Date.now(),
+          }),
+        }).catch(() => {});
+        // #endregion
+        setError(errMsg);
       }
+      setRecording(false);
+      setProcessing(false);
     };
 
     mediaRecorder.start();
     setRecording(true);
+    // #region agent log
+    fetch("http://127.0.0.1:7517/ingest/29f6c99d-6e54-4411-8bb7-56e270ef8e56", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "d18319" },
+      body: JSON.stringify({
+        sessionId: "d18319",
+        location: "page.tsx:doStartRecording",
+        message: "MediaRecorder started, ref set",
+        data: { hypothesisId: "H2" },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    // #endregion
   };
 
   const stopRecording = () => {
-    mediaRecorderRef.current?.stop();
-    setRecording(false);
+    const state = mediaRecorderRef.current?.state;
+    // #region agent log
+    console.log("Stopping...", state);
+    fetch("http://127.0.0.1:7517/ingest/29f6c99d-6e54-4411-8bb7-56e270ef8e56", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "d18319" },
+      body: JSON.stringify({
+        sessionId: "d18319",
+        location: "page.tsx:stopRecording",
+        message: "Stop button handler invoked",
+        data: {
+          hasRef: !!mediaRecorderRef.current,
+          recorderState: state ?? null,
+          recording,
+          hypothesisId: "H1_H2_H3_H4_H5",
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    // #endregion
+    if (mediaRecorderRef.current?.state === "recording") {
+      mediaRecorderRef.current.stop();
+      setRecording(false);
+      setProcessing(true);
+    }
   };
+
+  const handleSave = () => {
+    const entry: SavedStory = {
+      id: crypto.randomUUID(),
+      title: title || "Untitled memory",
+      narrative,
+      createdAt: new Date().toISOString(),
+    };
+    const next = [...stories, entry].slice(-MAX_STORIES);
+    setStories(next);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    setSaved(true);
+  };
+
+  const resetSession = () => {
+    setTurn(0);
+    setTitle("");
+    setNarrative("");
+    setFollowUpQuestion("");
+    setTranscript("");
+    setSessionComplete(false);
+    setSaved(false);
+    setError(null);
+    setProcessing(false);
+  };
+
+  const showRespond =
+    (turn === 1 || turn === 2) &&
+    !!narrative &&
+    !!followUpQuestion &&
+    !recording &&
+    !processing;
+  const showSessionComplete = sessionComplete && turn >= 3;
 
   return (
     <main className="p-10 max-w-xl mx-auto space-y-6">
       <h1 className="text-2xl font-bold">Before You Die</h1>
 
       <p className="text-sm text-zinc-600 dark:text-zinc-400">
-        Record a short memory. You’ll see the transcript and a structured version with follow-up questions.
+        Record a short memory. You’ll see it turned into a first-person narrative and a follow-up question. You can respond up to two more times to go deeper.
       </p>
 
-      {!recording ? (
+      {processing && (
+        <p className="text-zinc-600 dark:text-zinc-400" role="status">
+          Processing your memory… (this may take a minute)
+        </p>
+      )}
+
+      {/* Recording: either Start Story (turn 0) or Respond (turn 1 or 2) */}
+      {!recording && !processing && turn === 0 && (
         <button
           type="button"
-          onClick={startRecording}
-          className="min-h-[48px] min-w-[200px] cursor-pointer rounded-lg border-2 border-black bg-black px-6 py-3 text-lg font-medium text-white transition hover:bg-zinc-800 dark:border-white dark:bg-white dark:text-black dark:hover:bg-zinc-200"
-          style={{
-            minHeight: "48px",
-            minWidth: "200px",
-            cursor: "pointer",
-            borderRadius: "8px",
-            border: "2px solid #171717",
-            background: "#171717",
-            color: "#fff",
-            padding: "12px 24px",
-            fontSize: "1.125rem",
-            fontWeight: 500,
+          onClick={() => {
+            startRecording("initial");
+            doStartRecording();
           }}
+          className="min-h-[48px] min-w-[200px] cursor-pointer rounded-lg border-2 border-black bg-black px-6 py-3 text-lg font-medium text-white transition hover:bg-zinc-800 dark:border-white dark:bg-white dark:text-black dark:hover:bg-zinc-200"
         >
           Start Story
         </button>
-      ) : (
+      )}
+
+      {!recording && !processing && showRespond && (
+        <button
+          type="button"
+          onClick={() => {
+            startRecording("respond");
+            doStartRecording();
+          }}
+          className="min-h-[48px] min-w-[200px] cursor-pointer rounded-lg border-2 border-zinc-700 bg-zinc-700 px-6 py-3 text-lg font-medium text-white transition hover:bg-zinc-600 dark:border-zinc-500 dark:bg-zinc-500 dark:hover:bg-zinc-400"
+        >
+          Respond
+        </button>
+      )}
+
+      {recording && (
         <button
           type="button"
           onClick={stopRecording}
           className="min-h-[48px] min-w-[200px] cursor-pointer rounded-lg border-2 border-red-600 bg-red-600 px-6 py-3 text-lg font-medium text-white transition hover:bg-red-700"
-          style={{
-            minHeight: "48px",
-            minWidth: "200px",
-            cursor: "pointer",
-            borderRadius: "8px",
-            border: "2px solid #b91c1c",
-            background: "#b91c1c",
-            color: "#fff",
-            padding: "12px 24px",
-            fontSize: "1.125rem",
-            fontWeight: 500,
-          }}
         >
           Stop Recording
         </button>
@@ -141,26 +342,84 @@ export default function Home() {
       {transcript && (
         <div>
           <h2 className="font-semibold mt-4">Transcript</h2>
-          <p className="text-gray-700">{transcript}</p>
+          <p className="text-gray-700 dark:text-gray-300">{transcript}</p>
         </div>
       )}
 
-      {result && (
+      {narrative && (
         <div className="space-y-2">
-          <h2 className="font-semibold mt-4">Structured Memory</h2>
-          <p>
-            <strong>Title:</strong> {result.title}
-          </p>
-          <p>{result.narrative}</p>
-          <div>
-            <strong>Follow Up:</strong>
-            <ul className="list-disc ml-6">
-              {result.questions.map((q: string, i: number) => (
-                <li key={i}>{q}</li>
-              ))}
-            </ul>
-          </div>
+          <h2 className="font-semibold mt-4">Memory</h2>
+          {title && (
+            <p>
+              <strong>Title:</strong> {title}
+            </p>
+          )}
+          <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{narrative}</p>
+
+          {!showSessionComplete && followUpQuestion && (
+            <div className="pt-2">
+              <strong>Follow-up:</strong>{" "}
+              <span className="text-gray-700 dark:text-gray-300">{followUpQuestion}</span>
+            </div>
+          )}
+
+          {showSessionComplete && (
+            <div className="pt-4 space-y-2">
+              <p className="text-zinc-600 dark:text-zinc-400 italic">
+                This memory feels complete for now. Would you like to save it?
+              </p>
+              {!saved ? (
+                <button
+                  type="button"
+                  onClick={handleSave}
+                  className="rounded-lg border-2 border-zinc-400 bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-800 hover:bg-zinc-200 dark:border-zinc-500 dark:bg-zinc-700 dark:text-zinc-100 dark:hover:bg-zinc-600"
+                >
+                  Save this memory
+                </button>
+              ) : (
+                <p className="text-sm text-green-700 dark:text-green-400">Saved.</p>
+              )}
+              <button
+                type="button"
+                onClick={resetSession}
+                className="ml-2 rounded-lg border border-zinc-400 px-4 py-2 text-sm text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
+              >
+                Start new memory
+              </button>
+            </div>
+          )}
         </div>
+      )}
+
+      {narrative && (
+        <p className="text-xs text-zinc-500 dark:text-zinc-400 flex items-center gap-1">
+          <span aria-hidden>🔒</span> Processed via private inference
+        </p>
+      )}
+
+      {/* Previous memories */}
+      {stories.length > 0 && (
+        <section className="mt-8 pt-6 border-t border-zinc-200 dark:border-zinc-700">
+          <h2 className="font-semibold mb-2">Previous memories</h2>
+          <ul className="space-y-2">
+            {stories.slice().reverse().map((s) => (
+              <li key={s.id} className="border border-zinc-200 dark:border-zinc-700 rounded-lg p-3">
+                <button
+                  type="button"
+                  onClick={() => setExpandedStoryId(expandedStoryId === s.id ? null : s.id)}
+                  className="text-left w-full font-medium text-zinc-800 dark:text-zinc-200"
+                >
+                  {s.title}
+                </button>
+                {expandedStoryId === s.id && (
+                  <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400 whitespace-pre-wrap">
+                    {s.narrative}
+                  </p>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
     </main>
   );
