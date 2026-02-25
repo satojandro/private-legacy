@@ -4,10 +4,9 @@ const VENICE_CHAT_URL =
   process.env.VENICE_API_BASE_URL ?? "https://api.venice.ai/api/v1";
 
 /**
- * POST /api/structure
- * Accepts { transcript }, sends to Venice Chat Completions, returns
- * { title, narrative, questions }.
- * See https://docs.venice.ai/api-reference/api-spec
+ * POST /api/continue
+ * Accepts { narrative, lastQuestion, transcript }. Integrates the new response
+ * into the narrative and returns one follow-up question. Single user payload.
  */
 export async function POST(req: NextRequest) {
   const apiKey = process.env.VENICE_API_KEY;
@@ -19,7 +18,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  let body: { transcript?: string };
+  let body: { narrative?: string; lastQuestion?: string; transcript?: string };
   try {
     body = await req.json();
   } catch {
@@ -29,7 +28,19 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { transcript } = body;
+  const { narrative, lastQuestion, transcript } = body;
+  if (typeof narrative !== "string" || !narrative.trim()) {
+    return NextResponse.json(
+      { error: "Missing or empty 'narrative' in body" },
+      { status: 400 }
+    );
+  }
+  if (typeof lastQuestion !== "string" || !lastQuestion.trim()) {
+    return NextResponse.json(
+      { error: "Missing or empty 'lastQuestion' in body" },
+      { status: 400 }
+    );
+  }
   if (typeof transcript !== "string" || !transcript.trim()) {
     return NextResponse.json(
       { error: "Missing or empty 'transcript' in body" },
@@ -37,19 +48,18 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const systemPrompt = `You are a calm memoir interviewer. Rewrite the spoken memory in first-person voice as if the speaker is reflecting back on the moment. Keep it calm, natural, and grounded. Do not exaggerate. Avoid commentary. Preserve emotional subtlety. Do not dramatize or moralize.
+  const systemPrompt = `You are a calm memoir interviewer. Integrate the new response into the existing narrative in first person. Preserve tone. Do not exaggerate. Then ask one thoughtful follow-up question. Return only valid JSON: { "narrative": "", "question": "" }`;
 
-Turn it into:
-1. A short title
-2. A structured narrative paragraph (first person)
-3. Two gentle follow-up questions.
+  const userContent = `Current narrative:
+${narrative}
 
-Return only valid JSON in this exact shape (no markdown, no extra text):
-{
-  "title": "",
-  "narrative": "",
-  "questions": []
-}`;
+Previous follow-up question:
+${lastQuestion}
+
+User's new response:
+${transcript}
+
+Integrate the new response naturally into the narrative.`;
 
   const model =
     process.env.VENICE_MODEL ?? "venice-uncensored";
@@ -65,7 +75,7 @@ Return only valid JSON in this exact shape (no markdown, no extra text):
         model,
         messages: [
           { role: "system", content: systemPrompt },
-          { role: "user", content: transcript },
+          { role: "user", content: userContent },
         ],
         venice_parameters: {
           include_venice_system_prompt: false,
@@ -93,26 +103,23 @@ Return only valid JSON in this exact shape (no markdown, no extra text):
       );
     }
 
-    // Strip markdown code block if present
     let content = rawContent.trim();
     const codeMatch = content.match(/^```(?:json)?\s*([\s\S]*?)```$/);
     if (codeMatch) content = codeMatch[1].trim();
 
     const parsed = JSON.parse(content) as {
-      title?: string;
       narrative?: string;
-      questions?: string[];
+      question?: string;
     };
 
     return NextResponse.json({
-      title: parsed.title ?? "",
       narrative: parsed.narrative ?? "",
-      questions: Array.isArray(parsed.questions) ? parsed.questions : [],
+      question: parsed.question ?? "",
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     return NextResponse.json(
-      { error: "Structure failed", details: message },
+      { error: "Continue failed", details: message },
       { status: 500 }
     );
   }

@@ -72,26 +72,11 @@ export default function Home() {
     };
 
     mediaRecorder.onstop = async () => {
-      const chunksCount = chunksRef.current.length;
       streamRef.current?.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
       setError(null);
 
       const blob = new Blob(chunksRef.current, { type: "audio/webm" });
-      const blobSize = blob.size;
-      // #region agent log
-      fetch("http://127.0.0.1:7517/ingest/29f6c99d-6e54-4411-8bb7-56e270ef8e56", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "d18319" },
-        body: JSON.stringify({
-          sessionId: "d18319",
-          location: "page.tsx:onstop",
-          message: "onstop fired, blob built",
-          data: { chunksCount, blobSize, hypothesisId: "onstop_blob" },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {});
-      // #endregion
       const formData = new FormData();
       formData.append("file", blob);
 
@@ -101,25 +86,6 @@ export default function Home() {
           body: formData,
         });
         const data = await res.json();
-        // #region agent log
-        fetch("http://127.0.0.1:7517/ingest/29f6c99d-6e54-4411-8bb7-56e270ef8e56", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "d18319" },
-          body: JSON.stringify({
-            sessionId: "d18319",
-            location: "page.tsx:after_transcribe",
-            message: "transcribe response",
-            data: {
-              ok: res.ok,
-              status: res.status,
-              transcriptLength: typeof data?.transcript === "string" ? data.transcript.length : 0,
-              error: data?.error ?? null,
-              hypothesisId: "transcribe_res",
-            },
-            timestamp: Date.now(),
-          }),
-        }).catch(() => {});
-        // #endregion
         if (!res.ok) {
           const msg = data.details
             ? `${data.error ?? "Transcribe failed"}: ${data.details}`
@@ -184,21 +150,7 @@ export default function Home() {
           });
         }
       } catch (e) {
-        const errMsg = e instanceof Error ? e.message : "Something went wrong";
-        // #region agent log
-        fetch("http://127.0.0.1:7517/ingest/29f6c99d-6e54-4411-8bb7-56e270ef8e56", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "d18319" },
-          body: JSON.stringify({
-            sessionId: "d18319",
-            location: "page.tsx:onstop_catch",
-            message: "onstop try/catch",
-            data: { error: errMsg, hypothesisId: "onstop_catch" },
-            timestamp: Date.now(),
-          }),
-        }).catch(() => {});
-        // #endregion
-        setError(errMsg);
+        setError(e instanceof Error ? e.message : "Something went wrong");
       }
       setRecording(false);
       setProcessing(false);
@@ -206,42 +158,9 @@ export default function Home() {
 
     mediaRecorder.start();
     setRecording(true);
-    // #region agent log
-    fetch("http://127.0.0.1:7517/ingest/29f6c99d-6e54-4411-8bb7-56e270ef8e56", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "d18319" },
-      body: JSON.stringify({
-        sessionId: "d18319",
-        location: "page.tsx:doStartRecording",
-        message: "MediaRecorder started, ref set",
-        data: { hypothesisId: "H2" },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
   };
 
   const stopRecording = () => {
-    const state = mediaRecorderRef.current?.state;
-    // #region agent log
-    console.log("Stopping...", state);
-    fetch("http://127.0.0.1:7517/ingest/29f6c99d-6e54-4411-8bb7-56e270ef8e56", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "d18319" },
-      body: JSON.stringify({
-        sessionId: "d18319",
-        location: "page.tsx:stopRecording",
-        message: "Stop button handler invoked",
-        data: {
-          hasRef: !!mediaRecorderRef.current,
-          recorderState: state ?? null,
-          recording,
-          hypothesisId: "H1_H2_H3_H4_H5",
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
     if (mediaRecorderRef.current?.state === "recording") {
       mediaRecorderRef.current.stop();
       setRecording(false);
