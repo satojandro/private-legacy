@@ -46,7 +46,10 @@ export default function Home() {
         });
         const data = await res.json();
         if (!res.ok) {
-          setError(data.error ?? data.details ?? "Transcribe failed");
+          const msg = data.details
+            ? `${data.error ?? "Transcribe failed"}: ${data.details}`
+            : (data.error ?? data.details ?? "Transcribe failed");
+          setError(msg);
           return;
         }
         setTranscript(data.transcript);
@@ -58,7 +61,10 @@ export default function Home() {
         });
         const structured = await structureRes.json();
         if (!structureRes.ok) {
-          setError(structured.error ?? structured.details ?? "Structure failed");
+          const msg = structured.details
+            ? `${structured.error ?? "Structure failed"}: ${structured.details}`
+            : (structured.error ?? structured.details ?? "Structure failed");
+          setError(msg);
           return;
         }
         setResult(structured);
@@ -80,17 +86,47 @@ export default function Home() {
     <main className="p-10 max-w-xl mx-auto space-y-6">
       <h1 className="text-2xl font-bold">Before You Die</h1>
 
+      <p className="text-sm text-zinc-600 dark:text-zinc-400">
+        Record a short memory. You’ll see the transcript and a structured version with follow-up questions.
+      </p>
+
       {!recording ? (
         <button
+          type="button"
           onClick={startRecording}
-          className="bg-black text-white px-4 py-2 rounded"
+          className="min-h-[48px] min-w-[200px] cursor-pointer rounded-lg border-2 border-black bg-black px-6 py-3 text-lg font-medium text-white transition hover:bg-zinc-800 dark:border-white dark:bg-white dark:text-black dark:hover:bg-zinc-200"
+          style={{
+            minHeight: "48px",
+            minWidth: "200px",
+            cursor: "pointer",
+            borderRadius: "8px",
+            border: "2px solid #171717",
+            background: "#171717",
+            color: "#fff",
+            padding: "12px 24px",
+            fontSize: "1.125rem",
+            fontWeight: 500,
+          }}
         >
           Start Story
         </button>
       ) : (
         <button
+          type="button"
           onClick={stopRecording}
-          className="bg-red-600 text-white px-4 py-2 rounded"
+          className="min-h-[48px] min-w-[200px] cursor-pointer rounded-lg border-2 border-red-600 bg-red-600 px-6 py-3 text-lg font-medium text-white transition hover:bg-red-700"
+          style={{
+            minHeight: "48px",
+            minWidth: "200px",
+            cursor: "pointer",
+            borderRadius: "8px",
+            border: "2px solid #b91c1c",
+            background: "#b91c1c",
+            color: "#fff",
+            padding: "12px 24px",
+            fontSize: "1.125rem",
+            fontWeight: 500,
+          }}
         >
           Stop Recording
         </button>
