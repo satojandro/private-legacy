@@ -5,6 +5,9 @@ import { useState, useRef, useEffect } from "react";
 const STORAGE_KEY = "stories";
 const MAX_STORIES = 20;
 
+/** Total AI turns (1 structure + 2 continue) before showing save/download. */
+const TOTAL_AI_TURNS = 3;
+
 interface StructuredResult {
   title: string;
   narrative: string;
@@ -39,6 +42,26 @@ export default function Home() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const chunksRef = useRef<Blob[]>([]);
+
+  // Refs so the continue API always gets the latest narrative (avoids stale closure
+  // where the first structured narrative wasn’t sent and the first chunk was lost).
+  const narrativeRef = useRef("");
+  const titleRef = useRef("");
+  const followUpQuestionRef = useRef("");
+
+  // Ref for turn count so we count structure + continue consistently (avoids stale
+  // state in async onstop where turn could still be 0 and we'd need 4 turns to complete).
+  const turnRef = useRef(0);
+
+  useEffect(() => {
+    narrativeRef.current = narrative;
+    titleRef.current = title;
+    followUpQuestionRef.current = followUpQuestion;
+  }, [narrative, title, followUpQuestion]);
+
+  useEffect(() => {
+    turnRef.current = turn;
+  }, [turn]);
 
   // Load previous memories from localStorage on mount
   useEffect(() => {
@@ -113,19 +136,23 @@ export default function Home() {
             setProcessing(false);
             return;
           }
-          setTitle(structured.title);
-          setNarrative(structured.narrative);
+          setTitle(structured.title ?? "");
+          setNarrative(structured.narrative ?? "");
           setFollowUpQuestion(structured.questions?.[0] ?? "");
           setTranscript(newTranscript);
-          // Turn only increments after agent responds (not after user records)
+          // Count structure as turn 1 so we hit TOTAL_AI_TURNS (3) after 2 continues.
+          turnRef.current = 1;
           setTurn(1);
         } else {
+          // Use refs so we always send the latest narrative (including first turn from structure).
+          const currentNarrative = narrativeRef.current;
+          const currentQuestion = followUpQuestionRef.current;
           const continueRes = await fetch("/api/continue", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              narrative,
-              lastQuestion: followUpQuestion,
+              narrative: currentNarrative,
+              lastQuestion: currentQuestion,
               transcript: newTranscript,
             }),
           });
@@ -142,12 +169,12 @@ export default function Home() {
           setNarrative(continued.narrative ?? "");
           setFollowUpQuestion(continued.question ?? "");
           setTranscript(newTranscript);
-          // Turn only increments after agent responds
-          setTurn((t) => {
-            const next = t + 1;
-            if (next >= 3) setSessionComplete(true);
-            return next;
-          });
+          // Use ref so we count structure + continue (3 total: 1 structure + 2 continue).
+          const prevTurn = turnRef.current;
+          const nextTurn = prevTurn + 1;
+          turnRef.current = nextTurn;
+          if (nextTurn >= TOTAL_AI_TURNS) setSessionComplete(true);
+          setTurn(nextTurn);
         }
       } catch (e) {
         setError(e instanceof Error ? e.message : "Something went wrong");
@@ -182,6 +209,7 @@ export default function Home() {
   };
 
   const resetSession = () => {
+    turnRef.current = 0;
     setTurn(0);
     setTitle("");
     setNarrative("");
@@ -231,7 +259,7 @@ export default function Home() {
     !!followUpQuestion &&
     !recording &&
     !processing;
-  const showSessionComplete = sessionComplete && turn >= 3;
+  const showSessionComplete = sessionComplete && turn >= TOTAL_AI_TURNS;
 
   return (
     <main className="p-10 max-w-xl mx-auto space-y-8">
