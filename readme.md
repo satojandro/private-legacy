@@ -1,212 +1,224 @@
-Yes.
-That’s a very good instinct.
 
-When Cursor only sees code tasks, it optimizes for plumbing.
-When it sees intent, it optimizes for experience.
+# 🕯 Before You Die
 
-Below is a README / project brief you can drop into the root of the repo as `README.md`.
-
-This keeps the soul intact while still being buildable.
-
----
-
-# README.md
-
-## 🕯 Before You Die
-
-**A Private Legacy Copilot**
+**A quiet place to remember — and turn moments into stories.**
 
 ---
 
 ## What This Is
 
-Before You Die is a simple, private voice-based application that helps people tell and preserve their life stories.
+Before You Die is a private, voice-based memoir companion.
 
-The user speaks a memory.
+You speak a memory.
+
 The system:
 
 1. Transcribes it privately.
-2. Structures it into a readable narrative.
-3. Suggests gentle follow-up questions.
-4. Preserves the moment without dramatizing or moralizing.
+2. Clarifies it into a grounded narrative.
+3. Gently asks one thoughtful follow-up.
+4. Helps you see what the moment meant — without rewriting your life.
 
 This is not therapy.
 This is not autobiography automation.
-This is not an AI that rewrites someone’s life.
+This is not AI “content generation.”
 
-This is a calm interviewer that helps someone tell one memory at a time.
+It is a calm, structured listener — one memory at a time.
 
 ---
 
-## Why It Matters
+## Why It Exists
 
-Many of the most meaningful stories we hear from our parents or grandparents are told casually:
+For years, long-form memory lived in email.
 
-* Over the phone.
-* During dinner.
-* In passing.
+When people moved countries.
+When someone felt alone.
+When something changed.
+
+Those messages were reflective. Intentional. Preserved.
+
+Then communication became instant.
+Shorter. Fragmented. Ephemeral.
+
+We lost something.
+
+Before You Die explores whether AI can help restore that depth — privately — without turning memory into a product.
+
+Because most meaningful stories are told:
+
 * Once.
+* Casually.
+* Over dinner.
+* On a phone call.
+* In passing.
 
-They are rarely recorded.
-They are rarely structured.
-They disappear.
+And then they vanish.
 
-This project exists to:
+This project asks:
 
-* Preserve stories before they vanish.
-* Give seniors (or anyone) a private space to speak freely.
-* Capture unfiltered memories without centralized logging.
-* Structure memories gently so they can be revisited.
-
-Privacy is not a feature here — it is essential.
-
-People will share:
-
-* Regrets
-* Migration stories
-* Relationships
-* Secrets
-* Loss
-* Personal history
-
-That data must not be harvested or retained by centralized systems.
+What if we could gently preserve those moments before they disappear?
 
 ---
 
 ## Core Principles
 
-### 1. Privacy First
+### 1. Privacy Is Structural
 
 All inference runs through Venice private endpoints.
-No third-party logging.
-No data reuse.
-No model training.
 
-### 2. Calm Tone
+* No centralized logging.
+* No third-party analytics.
+* No model training on user data.
+* No database required for MVP.
 
-The assistant must:
+Stories are stored locally in the browser unless the user chooses to export them.
 
-* Avoid dramatization.
-* Avoid therapy language.
-* Avoid moral advice.
-* Avoid exaggeration.
-* Avoid “inspirational” fluff.
+This matters because people will speak about:
 
-It should feel like:
+* Migration.
+* Regret.
+* Identity.
+* Loss.
+* Secrets.
+* Becoming.
 
-* A quiet interviewer.
-* A respectful listener.
-* A gentle organizer of thought.
-
-### 3. One Memory at a Time
-
-This MVP focuses on:
-
-* Recording one story.
-* Structuring it.
-* Suggesting follow-up questions.
-
-No archive system.
-No sharing system.
-No full autobiography generation.
-
-Just one story.
+That data must not be harvested.
 
 ---
 
-## MVP Scope
+### 2. Calm Over Drama
+
+The assistant:
+
+* Does not exaggerate.
+* Does not moralize.
+* Does not therapize.
+* Does not fabricate emotional intensity.
+* Does not “optimize for inspiration.”
+
+It clarifies.
+
+It identifies structure.
+
+It highlights turning points.
+
+It helps the speaker see what was already there.
+
+---
+
+### 3. One Memory at a Time
+
+No full autobiography generation.
+No life timeline builder.
+No archive system.
+No gamification.
+
+Just:
+
+Speak → Reflect → Deepen → Preserve.
+
+Three turns.
+Then stop.
+
+---
+
+## What It Does (MVP)
 
 ### Frontend
 
-* Record voice (MediaRecorder)
-* Send audio to backend
-* Display transcript
-* Display structured output:
-
-  * Title
-  * Narrative paragraph
-  * 2 follow-up questions
+* Voice recording via MediaRecorder
+* Private transcription
+* Structured narrative display
+* Gentle follow-up question
+* Local storage (browser only)
+* Download as `.txt` or `.md`
 
 ### Backend
 
 * `/api/transcribe`
+  → Sends audio to Venice STT
+  → Returns transcript
 
-  * Send audio to Venice STT
-  * Return transcript
 * `/api/structure`
+  → Sends transcript to Venice reasoning
+  → Returns structured JSON:
 
-  * Send transcript to Venice reasoning
-  * Return structured JSON:
+```json
+{
+  "title": "",
+  "narrative": "",
+  "questions": []
+}
+```
 
-    ```json
-    {
-      "title": "",
-      "narrative": "",
-      "questions": []
-    }
-    ```
+* `/api/continue`
+  → Integrates new response into full narrative
+  → Preserves identity across turns
+  → Returns complete updated story + one question
 
 No streaming.
-No persistence required.
-No database required for MVP.
+No database.
+No orchestration framework.
+
+Just controlled inference and deliberate structure.
 
 ---
 
-## Experience Guidelines
+## Experience Design
 
-The UI should feel:
+The interface is intentionally minimal.
 
-* Spacious
-* Minimal
-* Calm
-* Respectful
-* Not flashy
-* Not gamified
-
-Think:
+It should feel like:
 
 * A quiet writing desk.
-* Not a productivity app.
-* Not a chatbot playground.
+* A private conversation.
+* A space, not a tool.
 
-Typography should be readable and warm.
-Avoid clutter.
+No chat bubbles.
+No flashing UI.
+No gamified streaks.
+No AI “assistant persona.”
+
+Typography is warm.
+Spacing is generous.
+Language is restrained.
+
+The goal is psychological safety.
 
 ---
 
-## Demo Narrative (Hackathon Context)
+## What This Demonstrates
 
 This project demonstrates:
 
 * Multimodal private inference (voice + reasoning).
-* Sensitive memory capture without centralized retention.
-* A humane AI use case grounded in real family dynamics.
-* Technology that preserves history at the edge, not in the cloud.
+* Narrative continuity across turns.
+* Sensitive memory capture without centralized storage.
+* A humane AI use case grounded in real human dynamics.
+* Edge-preserved history instead of cloud-harvested content.
 
-It answers the question:
+It explores a deeper question:
 
-What kinds of intelligence only exist if inference is private?
+What kinds of intelligence only make sense when inference is private?
 
 Answer:
-Life stories.
+
+Memory.
 
 ---
 
 ## Non-Goals
 
-Do not implement:
+This is not:
 
-* Full memoir generation.
-* Multi-user accounts.
-* Sharing/export systems.
-* Encryption vaults (MVP).
-* Streaming agent frameworks.
-* Over-engineered orchestration.
-* Feature creep.
+* A full memoir platform.
+* A therapy product.
+* A journaling SaaS.
+* A social network.
+* A “memory AI startup.”
 
-Keep it simple.
-Keep it working.
-Keep it calm.
+It is a proof of concept:
+
+Can intelligence help preserve human meaning without extracting it?
 
 ---
 
@@ -214,57 +226,89 @@ Keep it calm.
 
 A working demo where:
 
-* User speaks for 30–60 seconds.
+* A user speaks for 30–60 seconds.
 * Transcript appears.
-* Structured narrative appears.
-* Follow-up questions appear.
-* Tone feels grounded and respectful.
-* All inference uses Venice endpoints.
+* A grounded narrative appears.
+* One thoughtful follow-up appears.
+* The narrative evolves coherently across turns.
+* The tone feels restrained and respectful.
+* All inference runs through private Venice endpoints.
+* The story is stored only locally unless exported.
+
+If that works, the concept works.
 
 ---
 
-## Run locally
-
-Anyone can run Before You Die on their machine by cloning the repo and following these steps.
+## Run Locally
 
 ### Prerequisites
 
-- **Node.js** 18+ (recommend 20+)
-- **npm**, **yarn**, **pnpm**, or **bun**
-- **ffmpeg** (for audio handling). On macOS: `brew install ffmpeg`. If the app can’t find it, set `FFMPEG_BIN` in `.env` (see below).
-- A **Venice API key** from [venice.ai](https://venice.ai) (get one at [venice.ai/settings/api](https://venice.ai/settings/api)).
+* Node.js 18+ (20+ recommended)
+* npm / yarn / pnpm / bun
+* ffmpeg
+  macOS:
 
-### Steps
+  ```bash
+  brew install ffmpeg
+  ```
+* Venice API key
+  [https://venice.ai/settings/api](https://venice.ai/settings/api)
 
-1. **Clone the repo** and go into the project directory:
-   ```bash
-   git clone <repository-url>
-   cd <repo-directory-name>
-   ```
+---
 
-2. **Go into the app and install dependencies**
-   ```bash
-   cd before-you-die
-   npm install
-   ```
+### Setup
 
-3. **Configure environment**
-   - Copy the example env file and add your Venice API key:
-     ```bash
-     cp .env.example .env
-     ```
-   - Edit `.env` and set `VENICE_API_KEY` to your key. Optionally set `VENICE_MODEL` and `VENICE_TRANSCRIBE_MODEL` (see `.env.example` for comments).
+```bash
+git clone <repository-url>
+cd <repo-directory-name>
+cd before-you-die
+npm install
+```
 
-4. **Start the dev server**
-   ```bash
-   npm run dev
-   ```
+Copy environment file:
 
-5. **Open in a browser**  
-   Go to [http://localhost:3000](http://localhost:3000). You can record a short memory, see the transcript, structured narrative, and follow-up questions.
+```bash
+cp .env.example .env
+```
 
-For more detail (optional env vars, ffmpeg path, etc.), see `before-you-die/README.md` and `before-you-die/.env.example`.
+Set:
 
+```
+VENICE_API_KEY=your_key_here
+```
 
+Optional:
 
+* `VENICE_MODEL`
+* `VENICE_TRANSCRIBE_MODEL`
+* `FFMPEG_BIN` (if needed)
+
+Run:
+
+```bash
+npm run dev
+```
+
+Open:
+
+```
+http://localhost:3000
+```
+
+Record a memory.
+Watch it take shape.
+Save or download it.
+Refresh — your saved stories remain in your browser.
+
+---
+
+## Final Note
+
+Before You Die is intentionally simple.
+
+It does not try to be everything.
+
+It tries to do one thing well:
+
+Give someone a private space to speak — and help that moment become something they can keep.
 
