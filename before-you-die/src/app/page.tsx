@@ -193,6 +193,38 @@ export default function Home() {
     setProcessing(false);
   };
 
+  const downloadMemory = (format: "txt" | "md") => {
+    const safeTitle =
+      (title || "memory")
+        .toLowerCase()
+        .replace(/[^\w\s-]/g, "")
+        .replace(/\s+/g, "-")
+        .slice(0, 50) || "memory";
+    const ext = format === "txt" ? "txt" : "md";
+    const displayTitle = title || "Untitled memory";
+    const gentleBlock =
+      followUpQuestion?.trim() ?
+        `\n\n---\n\nA gentle question:\n${followUpQuestion.trim()}\n\n---\n\n`
+      : "\n\n---\n\n";
+    let content: string;
+    if (format === "txt") {
+      content =
+        `Title: ${displayTitle}\n\n${narrative}${gentleBlock}Processed privately.`;
+    } else {
+      content =
+        `# ${displayTitle}\n\n${narrative}${gentleBlock}_Processed privately._`;
+    }
+    const blob = new Blob([content], {
+      type: format === "txt" ? "text/plain" : "text/markdown",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${safeTitle}.${ext}`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const showRespond =
     (turn === 1 || turn === 2) &&
     !!narrative &&
@@ -301,25 +333,43 @@ export default function Home() {
           )}
 
           {showSessionComplete && (
-            <div className="pt-4 space-y-2">
+            <div className="pt-4 space-y-3">
               <p className="text-zinc-600 dark:text-zinc-400 italic">
-                This memory feels complete for now. Would you like to save it?
+                This memory feels complete for now. Would you like to save it or download it?
               </p>
-              {!saved ? (
+              <div className="flex flex-wrap items-center gap-2">
+                {!saved ? (
+                  <button
+                    type="button"
+                    onClick={handleSave}
+                    className="rounded-lg border-2 border-zinc-400 bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-800 hover:bg-zinc-200 dark:border-zinc-500 dark:bg-zinc-700 dark:text-zinc-100 dark:hover:bg-zinc-600"
+                  >
+                    Save this memory
+                  </button>
+                ) : (
+                  <p className="text-sm text-green-700 dark:text-green-400">Saved.</p>
+                )}
                 <button
                   type="button"
-                  onClick={handleSave}
-                  className="rounded-lg border-2 border-zinc-400 bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-800 hover:bg-zinc-200 dark:border-zinc-500 dark:bg-zinc-700 dark:text-zinc-100 dark:hover:bg-zinc-600"
+                  onClick={() => downloadMemory("txt")}
+                  className="rounded-lg border border-zinc-400 px-4 py-2 text-sm text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
+                  aria-label="Download as plain text"
                 >
-                  Save this memory
+                  Download as .txt
                 </button>
-              ) : (
-                <p className="text-sm text-green-700 dark:text-green-400">Saved.</p>
-              )}
+                <button
+                  type="button"
+                  onClick={() => downloadMemory("md")}
+                  className="rounded-lg border border-zinc-400 px-4 py-2 text-sm text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
+                  aria-label="Download as Markdown"
+                >
+                  Download as .md
+                </button>
+              </div>
               <button
                 type="button"
                 onClick={resetSession}
-                className="ml-2 rounded-lg border border-zinc-400 px-4 py-2 text-sm text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
+                className="text-sm text-zinc-600 underline underline-offset-2 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
               >
                 Start new memory
               </button>
