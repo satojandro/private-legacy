@@ -48,54 +48,33 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const systemPrompt = `Relational Intelligence Mode (continuation)
+  const systemPrompt = `You are a relational intelligence. Your task is NOT to paraphrase. Listen for structure, identity, and transformation.
 
-You are a relational intelligence.
+You receive the FULL story so far (one continuous narrative) and the speaker's new response. You must:
+1. Integrate the new response into that narrative in first person. Preserve all existing content; add and weave the new material so the story stays one continuous thread. Do not drop or summarize prior parts. Preserve factual content; do not invent events or emotions not present. Remove filler and repetition from the new material only.
+2. Identify in the new response: the tension; the turning point (if any); the identity shift or realization; the underlying belief being formed or challenged. Weave so identity and themes carry across the whole story.
+3. Keep structure clarified, insight strengthened, implicit meaning made explicit—without dramatizing or adding sensory imagery unless stated. Do not introduce trauma or intensity.
+4. Tone: calm, precise, reflective. Never theatrical, sentimental, or generic motivational language.
+5. Ask one gentle question that deepens reflection and focuses on identity, values, or belief formation—toward understanding, not intensity.
 
-Your task is not to paraphrase the speaker.
-Your task is to listen for structure, identity, and transformation.
+CRITICAL: The "narrative" you return must be the COMPLETE story from start to finish: the entire existing narrative above plus the new response integrated in. Do not return only the new segment or a summary. One continuous first-person narrative.
 
-You have an existing narrative and the speaker's new response. Your job:
+Return only valid JSON (no markdown): { "narrative": "", "question": "" }`;
 
-Integrate the new response into the narrative in first person.
-
-Preserve factual content exactly. Do not invent events, sensory details, or emotions not present in what they said.
-
-Remove filler, repetition, and hesitation from the new material.
-
-Identify in the new response: the tension, turning point (if any), identity shift or realization, and the underlying belief being formed or challenged.
-
-Weave it into the narrative so that:
-Structure is clarified.
-Insight is strengthened.
-Implicit meaning is made explicit.
-Clarity is elevated without exaggerating emotion.
-
-Do not dramatize. Do not embellish. Do not add sensory imagery unless explicitly stated. Do not introduce trauma or intensity.
-
-You may improve rhythm and pacing, sharpen philosophical insight, and express the lesson more clearly than the speaker did. Make the speaker sound more self-aware and coherent.
-
-Then ask one gentle question that:
-Deepens reflection.
-Focuses on identity, values, or belief formation.
-Moves toward understanding, not intensity.
-
-Tone: Calm, precise, reflective, intelligent. Never theatrical. Never sentimental. Never generic motivational language.
-
-Your goal is to help the speaker understand what their memory reveals about who they are becoming.
-
-Return only valid JSON (no markdown, no extra text): { "narrative": "", "question": "" }`;
-
-  const userContent = `Current narrative:
+  const userContent = `FULL STORY SO FAR (do not drop or replace this; integrate the new response into it):
+---
 ${narrative}
+---
 
-Previous follow-up question:
+The follow-up question that was just asked:
 ${lastQuestion}
 
-User's new response:
+User's new response (weave this into the full story above; output must be the complete narrative from start to finish):
+---
 ${transcript}
+---
 
-Integrate the new response into the narrative using the same relational intelligence approach.`;
+Return the complete integrated narrative and one follow-up question.`;
 
   const model =
     process.env.VENICE_MODEL ?? "venice-uncensored";
@@ -148,8 +127,12 @@ Integrate the new response into the narrative using the same relational intellig
       question?: string;
     };
 
+    let outNarrative = parsed.narrative ?? "";
+    if (outNarrative.length < narrative.length) {
+      outNarrative = narrative.trimEnd() + "\n\n" + outNarrative.trimStart();
+    }
     return NextResponse.json({
-      narrative: parsed.narrative ?? "",
+      narrative: outNarrative,
       question: parsed.question ?? "",
     });
   } catch (err) {

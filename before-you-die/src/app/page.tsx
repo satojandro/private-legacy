@@ -53,6 +53,9 @@ export default function Home() {
   // state in async onstop where turn could still be 0 and we'd need 4 turns to complete).
   const turnRef = useRef(0);
 
+  // Mode at click time so onstop doesn't rely on React state (avoids stale closure).
+  const recordingModeRef = useRef<"initial" | "respond">("initial");
+
   useEffect(() => {
     narrativeRef.current = narrative;
     titleRef.current = title;
@@ -76,14 +79,10 @@ export default function Home() {
     }
   }, []);
 
-  const startRecording = (mode: "initial" | "respond") => {
+  const doStartRecording = async (mode: "initial" | "respond") => {
+    recordingModeRef.current = mode;
     setRecordingMode(mode);
     setError(null);
-    // Do NOT set recording true here — wait until MediaRecorder has started (in doStartRecording)
-    // so stopRecording() always has a valid ref and "recording" state.
-  };
-
-  const doStartRecording = async () => {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     streamRef.current = stream;
     const mediaRecorder = new MediaRecorder(stream);
@@ -95,6 +94,7 @@ export default function Home() {
     };
 
     mediaRecorder.onstop = async () => {
+      console.log("mode:", recordingModeRef.current);
       streamRef.current?.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
       setError(null);
@@ -120,7 +120,7 @@ export default function Home() {
         }
         const newTranscript = data.transcript;
 
-        if (recordingMode === "initial") {
+        if (recordingModeRef.current === "initial") {
           const structureRes = await fetch("/api/structure", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -136,11 +136,16 @@ export default function Home() {
             setProcessing(false);
             return;
           }
-          setTitle(structured.title ?? "");
-          setNarrative(structured.narrative ?? "");
-          setFollowUpQuestion(structured.questions?.[0] ?? "");
+          const firstTitle = structured.title ?? "";
+          const firstNarrative = structured.narrative ?? "";
+          const firstQuestion = structured.questions?.[0] ?? "";
+          setTitle(firstTitle);
+          setNarrative(firstNarrative);
+          setFollowUpQuestion(firstQuestion);
           setTranscript(newTranscript);
-          // Count structure as turn 1 so we hit TOTAL_AI_TURNS (3) after 2 continues.
+          narrativeRef.current = firstNarrative;
+          titleRef.current = firstTitle;
+          followUpQuestionRef.current = firstQuestion;
           turnRef.current = 1;
           setTurn(1);
         } else {
@@ -166,9 +171,15 @@ export default function Home() {
             setProcessing(false);
             return;
           }
-          setNarrative(continued.narrative ?? "");
-          setFollowUpQuestion(continued.question ?? "");
+          const nextNarrative = continued.narrative ?? "";
+          const nextQuestion = continued.question ?? "";
+          setNarrative(nextNarrative);
+          setFollowUpQuestion(nextQuestion);
           setTranscript(newTranscript);
+          // Sync refs immediately so the next continue call sends this full narrative
+          // even if the user continues before useEffect runs (avoids losing prior turns).
+          narrativeRef.current = nextNarrative;
+          followUpQuestionRef.current = nextQuestion;
           // Use ref so we count structure + continue (3 total: 1 structure + 2 continue).
           const prevTurn = turnRef.current;
           const nextTurn = prevTurn + 1;
@@ -297,10 +308,7 @@ export default function Home() {
       {!recording && !processing && turn === 0 && (
         <button
           type="button"
-          onClick={() => {
-            startRecording("initial");
-            doStartRecording();
-          }}
+          onClick={() => doStartRecording("initial")}
           className="min-h-[48px] min-w-[200px] cursor-pointer rounded-lg border-2 border-black bg-black px-6 py-3 text-lg font-medium text-white transition hover:bg-zinc-800 dark:border-white dark:bg-white dark:text-black dark:hover:bg-zinc-200"
         >
           Begin
@@ -310,10 +318,7 @@ export default function Home() {
       {!recording && !processing && showRespond && (
         <button
           type="button"
-          onClick={() => {
-            startRecording("respond");
-            doStartRecording();
-          }}
+          onClick={() => doStartRecording("respond")}
           className="min-h-[48px] min-w-[200px] cursor-pointer rounded-lg border-2 border-zinc-700 bg-zinc-700 px-6 py-3 text-lg font-medium text-white transition hover:bg-zinc-600 dark:border-zinc-500 dark:bg-zinc-500 dark:hover:bg-zinc-400"
         >
           Continue
