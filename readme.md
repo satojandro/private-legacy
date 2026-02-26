@@ -221,6 +221,50 @@ A working demo where:
 * Tone feels grounded and respectful.
 * All inference uses Venice endpoints.
 
+---
+
+## Run locally
+
+Anyone can run Before You Die on their machine by cloning the repo and following these steps.
+
+### Prerequisites
+
+- **Node.js** 18+ (recommend 20+)
+- **npm**, **yarn**, **pnpm**, or **bun**
+- **ffmpeg** (for audio handling). On macOS: `brew install ffmpeg`. If the app can’t find it, set `FFMPEG_BIN` in `.env` (see below).
+- A **Venice API key** from [venice.ai](https://venice.ai) (get one at [venice.ai/settings/api](https://venice.ai/settings/api)).
+
+### Steps
+
+1. **Clone the repo** and go into the project directory:
+   ```bash
+   git clone <repository-url>
+   cd <repo-directory-name>
+   ```
+
+2. **Go into the app and install dependencies**
+   ```bash
+   cd before-you-die
+   npm install
+   ```
+
+3. **Configure environment**
+   - Copy the example env file and add your Venice API key:
+     ```bash
+     cp .env.example .env
+     ```
+   - Edit `.env` and set `VENICE_API_KEY` to your key. Optionally set `VENICE_MODEL` and `VENICE_TRANSCRIBE_MODEL` (see `.env.example` for comments).
+
+4. **Start the dev server**
+   ```bash
+   npm run dev
+   ```
+
+5. **Open in a browser**  
+   Go to [http://localhost:3000](http://localhost:3000). You can record a short memory, see the transcript, structured narrative, and follow-up questions.
+
+For more detail (optional env vars, ffmpeg path, etc.), see `before-you-die/README.md` and `before-you-die/.env.example`.
+
 
 
 

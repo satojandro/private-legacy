@@ -1,36 +1,48 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Before You Die — app
 
-## Getting Started
+Next.js app for the Before You Die voice-based legacy copilot.
 
-First, run the development server:
+## Run locally (from a fresh clone)
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+### Prerequisites
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+- **Node.js** 18+ (20+ recommended)
+- **ffmpeg** — for audio processing. Install: `brew install ffmpeg` (macOS) or your system package manager. If you get `spawn ffmpeg ENOENT`, set `FFMPEG_BIN` in `.env` to your ffmpeg path (e.g. `/opt/homebrew/bin/ffmpeg`).
+- **Venice API key** — get one at [venice.ai/settings/api](https://venice.ai/settings/api). See [Venice API docs](https://docs.venice.ai/api-reference/api-spec).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Steps
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+1. **From the repo root**, go into this directory and install dependencies:
+   ```bash
+   cd before-you-die
+   npm install
+   ```
 
-## Learn More
+2. **Environment variables**  
+   Copy the example env and add your Venice API key:
+   ```bash
+   cp .env.example .env
+   ```
+   Edit `.env` and set:
+   - `VENICE_API_KEY` — **required**
+   - `VENICE_MODEL` — optional; default `venice-uncensored` (model for structuring the memory)
+   - `VENICE_TRANSCRIBE_MODEL` — optional; must be an ASR (speech-to-text) model id from Venice; see `.env.example` for details
 
-To learn more about Next.js, take a look at the following resources:
+3. **Start the dev server**
+   ```bash
+   npm run dev
+   ```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+4. Open [http://localhost:3000](http://localhost:3000) in your browser. Record a short memory to see transcription, structured narrative, and follow-up questions.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### Scripts
 
-## Deploy on Vercel
+- `npm run dev` — start Next.js dev server
+- `npm run build` — production build
+- `npm run start` — run production server after `npm run build`
+- `npm run lint` — run ESLint
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Learn more
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- [Next.js Documentation](https://nextjs.org/docs)
+- [Venice API](https://docs.venice.ai/api-reference/api-spec)
