@@ -110,13 +110,13 @@ export async function POST(req: NextRequest) {
   }
 
   const arrayBuffer = await file.arrayBuffer();
-  let buffer = Buffer.from(arrayBuffer);
+  let buffer: Buffer = Buffer.from(arrayBuffer);
   let format = (file.type?.replace("audio/", "") as string) || "webm";
 
   if (!VENICE_AUDIO_FORMATS.has(format)) {
     const inputExt = format || "webm";
     try {
-      buffer = await toWav(buffer, inputExt);
+      buffer = (await toWav(buffer, inputExt)) as Buffer;
       format = "wav";
     } catch (err) {
       const message = err instanceof Error ? err.message : "Conversion failed";
@@ -139,7 +139,7 @@ export async function POST(req: NextRequest) {
   }
 
   const form = new FormData();
-  form.append("file", new Blob([buffer], { type: "audio/wav" }), "audio.wav");
+  form.append("file", new Blob([buffer as BlobPart], { type: "audio/wav" }), "audio.wav");
   form.append("model", modelId);
 
   try {
