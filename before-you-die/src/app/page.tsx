@@ -202,12 +202,30 @@ export default function Home() {
   const showSessionComplete = sessionComplete && turn >= 3;
 
   return (
-    <main className="p-10 max-w-xl mx-auto space-y-6">
-      <h1 className="text-2xl font-bold">Before You Die</h1>
+    <main className="p-10 max-w-xl mx-auto space-y-8">
+      <header className="space-y-3">
+        <h1 className="text-2xl font-bold">Before You Die</h1>
+        <p className="text-sm text-zinc-500 dark:text-zinc-400">
+          A private space to remember.
+        </p>
+        <p className="text-sm text-zinc-600 dark:text-zinc-400">
+          Say something that happened — big or small. I'll listen and gently ask you one question.
+        </p>
+        <p className="text-xs text-zinc-500 dark:text-zinc-400 flex items-center gap-1">
+          <span aria-hidden>🔒</span> Processed privately. Nothing is stored unless you choose to save.
+        </p>
+        {turn === 0 && !narrative && (
+          <div className="text-xs text-zinc-400 dark:text-zinc-500 space-y-1 pt-1">
+            <p>Not sure what to say? Try:</p>
+            <ul className="list-disc list-inside space-y-0.5">
+              <li>A small moment from today</li>
+              <li>The first time you felt independent</li>
+              <li>A place that feels like home</li>
+            </ul>
+          </div>
+        )}
+      </header>
 
-      <p className="text-sm text-zinc-600 dark:text-zinc-400">
-        Record a short memory. You’ll see it turned into a first-person narrative and a follow-up question. You can respond up to two more times to go deeper.
-      </p>
 
       {processing && (
         <p className="text-zinc-600 dark:text-zinc-400" role="status">
@@ -215,7 +233,7 @@ export default function Home() {
         </p>
       )}
 
-      {/* Recording: either Start Story (turn 0) or Respond (turn 1 or 2) */}
+      {/* Recording: Begin (turn 0), Continue (turn 1–2), Stop Recording when active */}
       {!recording && !processing && turn === 0 && (
         <button
           type="button"
@@ -225,7 +243,7 @@ export default function Home() {
           }}
           className="min-h-[48px] min-w-[200px] cursor-pointer rounded-lg border-2 border-black bg-black px-6 py-3 text-lg font-medium text-white transition hover:bg-zinc-800 dark:border-white dark:bg-white dark:text-black dark:hover:bg-zinc-200"
         >
-          Start Story
+          Begin
         </button>
       )}
 
@@ -238,7 +256,7 @@ export default function Home() {
           }}
           className="min-h-[48px] min-w-[200px] cursor-pointer rounded-lg border-2 border-zinc-700 bg-zinc-700 px-6 py-3 text-lg font-medium text-white transition hover:bg-zinc-600 dark:border-zinc-500 dark:bg-zinc-500 dark:hover:bg-zinc-400"
         >
-          Respond
+          Continue
         </button>
       )}
 
@@ -259,26 +277,26 @@ export default function Home() {
       )}
 
       {transcript && (
-        <div>
-          <h2 className="font-semibold mt-4">Transcript</h2>
-          <p className="text-gray-700 dark:text-gray-300">{transcript}</p>
+        <div className="mt-6">
+          <h2 className="font-semibold">What you said</h2>
+          <p className="mt-1 text-zinc-500 dark:text-zinc-400">{transcript}</p>
         </div>
       )}
 
       {narrative && (
-        <div className="space-y-2">
-          <h2 className="font-semibold mt-4">Memory</h2>
+        <div className="space-y-2 mt-8" style={{ animation: "fadeIn 0.2s ease-out both" }}>
+          <h2 className="font-semibold">Your story so far</h2>
           {title && (
             <p>
               <strong>Title:</strong> {title}
             </p>
           )}
-          <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{narrative}</p>
+          <p className="text-stone-700 dark:text-stone-300 whitespace-pre-wrap">{narrative}</p>
 
           {!showSessionComplete && followUpQuestion && (
             <div className="pt-2">
-              <strong>Follow-up:</strong>{" "}
-              <span className="text-gray-700 dark:text-gray-300">{followUpQuestion}</span>
+              <strong>A gentle question:</strong>{" "}
+              <span className="text-stone-700 dark:text-stone-300">{followUpQuestion}</span>
             </div>
           )}
 
@@ -312,7 +330,7 @@ export default function Home() {
 
       {narrative && (
         <p className="text-xs text-zinc-500 dark:text-zinc-400 flex items-center gap-1">
-          <span aria-hidden>🔒</span> Processed via private inference
+          <span aria-hidden>🔒</span> Processed privately. Nothing is stored unless you choose to save.
         </p>
       )}
 
